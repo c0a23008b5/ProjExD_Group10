@@ -15,7 +15,7 @@ def main():
     pg.display.set_caption("はばたけ！こうかとん")
     screen = pg.display.set_mode((800, 600))
     clock  = pg.time.Clock()
-    bg_img = pg.image.load("fig/background1.jpg") #背景画像
+    bg_img = pg.image.load("fig/24535830.jpg") #背景画像
     bg_img2 = pg.transform.flip(bg_img, True, False) #背景画像
     kk_img = pg.image.load("fig/koukaton.png")
     kk_img = pg.transform.flip(kk_img, True, False)
