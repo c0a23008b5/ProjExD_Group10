@@ -454,6 +454,7 @@ def main():
 
                     # 新しい敵が大ボスならば、switch_to_bigbossを呼ぶ
                     if isinstance(enemies[current_enemy], Bigenemy):
+                        print("a")
                         enemies[current_enemy].switch_to_bigboss()
                     # 新しい敵が小ボスならば、switch_to_smallbossを呼ぶ
                     elif isinstance(enemies[current_enemy], Smallenemy):
