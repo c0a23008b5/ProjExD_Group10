@@ -62,7 +62,7 @@ class BossBeam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-    def __init__(self, enemy, image, mag=2.0):
+    def __init__(self, enemy, image, mag=2.0, speed = 10):
         """
         ビーム画像Surfaceを生成する
         引数 enemy：ビームを放つ敵
@@ -85,8 +85,9 @@ class BossBeam(pg.sprite.Sprite):
     
         self.image = pg.transform.rotozoom(pg.image.load(image), angle, mag)
         self.rect = self.image.get_rect()
-        self.rect.center = enemy.rect.center
-        self.speed = 10
+        self.rect.centery = enemy.rect.centery
+        self.rect.centerx = enemy.rect.centerx+(enemy.rect.width/2)*self.vx
+        self.speed = speed
 
     def update(self):
         """
@@ -250,6 +251,10 @@ class Smallenemy(pg.sprite.Sprite):
             self.rect.centerx = cx + radius * math.cos(self.angle)
             self.rect.centery = cy + radius * math.sin(self.angle)
 
+            # ビームの種類,大きさ
+            self.fig = "fig/cc.png"
+            self.mag = 0.1
+
             if self.current_mode_timer > self.mode_duration:  # 持続時間が終わったら次のモードへ
                 self.current_mode = 'vertical'
                 self.current_mode_timer = 0
@@ -260,6 +265,11 @@ class Smallenemy(pg.sprite.Sprite):
         elif self.current_mode == 'vertical':
             self.rect.y += self.speed
             _, tate = check_bound(self.rect)
+
+            # ビームの種類,大きさ
+            self.fig = "fig/bb.png"
+            self.mag = 0.1
+
             if not tate:
                 self.speed = -self.speed  # 方向を反転
             if self.current_mode_timer > self.mode_duration:  # 持続時間が終わったら次のモードへ
@@ -290,9 +300,9 @@ class Smallenemy(pg.sprite.Sprite):
         self.beam_timer += 1
         if self.beam_timer >= self.beam_interval:
             self.beam_timer = 0
-            self.beam_interval = random.randint(1, 3)
+            self.beam_interval = random.randint(3, 5)
             if self.current_mode != 'warp':  # ワープ中でなければビームを発射
-                return BossBeam(self, "fig/beam.png")
+                return BossBeam(self, self.fig, self.mag)
         return None
 
     def stop_music(self):
@@ -330,11 +340,11 @@ class Midboss(pg.sprite.Sprite):
         # 中ボスの画像を読み込み、サイズを調整して反転させます
         self.bg_img = pg.image.load("fig/24535848.jpg")
         self.bg_img = pg.transform.scale(self.bg_img, (WIDTH, HEIGHT))
-        self.image = pg.transform.rotozoom(pg.image.load("fig/mika.png"), 0, 1)
+        self.image = pg.transform.rotozoom(pg.image.load("fig/mika.png"), 0, 0.5)
         self.image = pg.transform.flip(self.image, False, False)
         self.rect = self.image.get_rect()
         self.rect.center = x, y
-        self.speed = 7  # 移動速度を小さくする
+        self.speed = 5  # 移動速度を小さくする
         self.target_y = self.rect.y  # 垂直移動の目標Y座標
         self.set_new_target()  # 初期目標位置を設定
         
@@ -377,11 +387,22 @@ class Midboss(pg.sprite.Sprite):
 
         self.direction = 0
 
+        # ビーム速度
+        self.b_speed = 0
+
         self.beam_timer += 1
         if self.beam_timer >= self.beam_interval:
             self.beam_timer = 0
-            self.beam_interval = random.randint(10, 30)
-            return BossBeam(self, "fig/b.png", 0.1)  # ビームを発射
+            randomcounter = random.randint(1, 30)
+            if randomcounter == 1:
+                self.beam_interval = random.randint(10, 30)
+                return BossBeam(self, "fig/b.png", 0.3)  # 大ビームを発射
+            elif 1 < randomcounter < 30:
+                self.beam_interval = random.randint(20, 30)
+                self.b_speed = 10
+                return BossBeam(self, "fig/mika_ac.png", 0.12, self.b_speed)
+    
+
         return None
 
     def stop_music(self):
