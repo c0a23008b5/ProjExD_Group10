@@ -58,6 +58,46 @@ class MusicPlayer:
         """
         pass
 
+class BossBeam(pg.sprite.Sprite):
+    """
+    ビームに関するクラス
+    """
+    def __init__(self, enemy, image, mag=2.0):
+        """
+        ビーム画像Surfaceを生成する
+        引数 enemy：ビームを放つ敵
+        """
+        super().__init__()
+        angle = 0
+        if isinstance(enemy, Midboss):  # Midboss クラスの場合は左側にビームを発射する
+            self.vx, self.vy = -math.cos(enemy.direction), -math.sin(enemy.direction)
+            angle = math.degrees(math.atan2(0, 0))
+        elif isinstance(enemy, Smallenemy):  # Smallenemy クラスの場合の条件分岐
+            if enemy.current_mode == 'rotate':
+                angle = random.uniform(225, 125)  # 扇状に放つ
+                self.vx, self.vy = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+                angle = math.degrees(math.atan2(-self.vy, self.vx))
+            elif enemy.current_mode == 'vertical':
+                self.vx, self.vy = -1, 0  # 左に向けて放つ
+                angle = math.degrees(math.atan2(-self.vy, self.vx))
+        else:
+            self.vx, self.vy = math.cos(enemy.direction), math.sin(enemy.direction)
+    
+        self.image = pg.transform.rotozoom(pg.image.load(image), angle, mag)
+        self.rect = self.image.get_rect()
+        self.rect.center = enemy.rect.center
+        self.speed = 10
+
+    def update(self):
+        """
+        ビームを速度ベクトルself.vx, self.vyに基づき移動させる
+        """
+        self.rect.move_ip(self.speed * self.vx, self.speed * self.vy)
+        
+        # 画面外に出たらビームを消去する
+        if not self.rect.colliderect(pg.Rect(0, 0, WIDTH, HEIGHT)):
+            self.kill()
+
 class Bigenemy(pg.sprite.Sprite):
     """
     大ボスに関するクラス
@@ -82,13 +122,11 @@ class Bigenemy(pg.sprite.Sprite):
         self.last_x = self.rect.x
         self.last_y = self.rect.y
         self.curve_factor = 0.1  # カーブの強さを調整する係数
+        self.beam_timer = 0
+        self.beam_interval = 500  # ビーム発射のためのタイマーを設定
 
         # 音楽プレイヤーを初期化
-        self.music_player = MusicPlayer("fig/4m.rarara.mp3", volume=0.5)
-
-        # サウンドの再生時間管理用のタイマー
-        self.sound_timer = 0
-        self.sound_duration = 500  # 500フレームごとに音楽を再生
+        self.music_player = MusicPlayer("fig/Will_you_still_cry.mp3", volume=0.5)
 
         # 初期状態では音楽は停止しておく
         self.stop_music()
@@ -96,7 +134,7 @@ class Bigenemy(pg.sprite.Sprite):
     def update(self):
         if random.random() < 0.04:  # ランダムに方向を変える確率
             self.target_direction = random.uniform(0, 2 * math.pi)
-            self.speed = random.uniform(5, 15)  # ランダムな速さに変更
+            # self.speed = random.randint(5, 15)  # ランダムな速さに変更
 
         # 方向を徐々にターゲット方向に向けて変更
         self.direction += (self.target_direction - self.direction) * 0.05
@@ -132,6 +170,13 @@ class Bigenemy(pg.sprite.Sprite):
         if not tate:
             self.direction = -self.direction
             self.target_direction = self.direction
+        
+        self.beam_timer += 1
+        if self.beam_timer >= self.beam_interval:
+            self.beam_timer = 0
+            self.beam_interval = random.randint(1, 3)
+            return BossBeam(self, "fig/p2.png", 0.1)  # ビームを発射
+        return None
 
     def stop_music(self):
         """
@@ -139,15 +184,18 @@ class Bigenemy(pg.sprite.Sprite):
         """
         self.music_player.stop()
 
+    def start_music(self):
+        """
+        音楽を再生するメソッド
+        """
+        self.music_player.play()
+
     def switch_to_bigboss(self):
         """
         大ボスに切り替わった際の処理
         ここで音楽を再生するなどの追加の処理を行う
         """
-        print("a")
-        self.music_player.play()  # 音楽を再生
-        self.sound_timer = self.sound_duration  # 再生タイマーを終了間隔にセット
-
+        self.start_music()
 
 
 class Smallenemy(pg.sprite.Sprite):
@@ -179,6 +227,16 @@ class Smallenemy(pg.sprite.Sprite):
         self.mode_duration = 300  # 各モードの持続時間（60fps * 5）
         self.current_mode_timer = 0
         self.current_mode = 'rotate'  # 初期モードは回転
+
+        # 音楽プレイヤーを初期化
+        self.music_player = MusicPlayer("fig/Vital_Waves.mp3", volume=0.5)
+
+        # 初期状態では音楽を再生する
+        self.start_music()
+
+        # ビームのためのタイマー
+        self.beam_timer = 0
+        self.beam_interval = 500  # ビーム発射のためのタイマーを設定
 
     def update(self):
         self.current_mode_timer += 1
@@ -228,11 +286,34 @@ class Smallenemy(pg.sprite.Sprite):
             self.rect.center = self.center
             self.warp_count = 0
         
+        # ビームの発射
+        self.beam_timer += 1
+        if self.beam_timer >= self.beam_interval:
+            self.beam_timer = 0
+            self.beam_interval = random.randint(1, 3)
+            if self.current_mode != 'warp':  # ワープ中でなければビームを発射
+                return BossBeam(self, "fig/beam.png")
+        return None
+
     def stop_music(self):
         """
         音楽を停止するメソッド
         """
-        pass  # Smallenemyにおいては音楽を停止する必要がないので、何も処理しない
+        self.music_player.stop()
+
+    def start_music(self):
+        """
+        音楽を再生するメソッド
+        """
+        self.music_player.play()
+
+    def switch_to_smallboss(self):
+        """
+        小ボスに切り替わった際の処理
+        ここで音楽を再生するなどの追加の処理を行う
+        """
+        self.start_music()
+
 
 
 class Midboss(pg.sprite.Sprite):
@@ -249,14 +330,23 @@ class Midboss(pg.sprite.Sprite):
         # 中ボスの画像を読み込み、サイズを調整して反転させます
         self.bg_img = pg.image.load("fig/24535848.jpg")
         self.bg_img = pg.transform.scale(self.bg_img, (WIDTH, HEIGHT))
-        s_boss_img = pg.transform.rotozoom(pg.image.load("fig/alien1.png"), 0, 2)
-        self.image = pg.transform.rotozoom(s_boss_img, 0, 0.2)
-        self.image = pg.transform.flip(self.image, True, False)
+        self.image = pg.transform.rotozoom(pg.image.load("fig/mika.png"), 0, 1)
+        self.image = pg.transform.flip(self.image, False, False)
         self.rect = self.image.get_rect()
         self.rect.center = x, y
         self.speed = 7  # 移動速度を小さくする
         self.target_y = self.rect.y  # 垂直移動の目標Y座標
         self.set_new_target()  # 初期目標位置を設定
+        
+
+        # 音楽プレイヤーを初期化
+        self.music_player = MusicPlayer("fig/crux.mp3", volume=0.5)
+
+        # 初期状態では音楽を再生する
+        self.stop_music()
+
+        self.beam_timer = 0
+        self.beam_interval = 500  # ビーム発射のためのタイマーを設定
 
     def set_new_target(self):
         """
@@ -285,13 +375,33 @@ class Midboss(pg.sprite.Sprite):
         if not tate:
             self.set_new_target()  # 垂直移動を元に戻すために新しい目標位置を設定
 
+        self.direction = 0
+
+        self.beam_timer += 1
+        if self.beam_timer >= self.beam_interval:
+            self.beam_timer = 0
+            self.beam_interval = random.randint(10, 30)
+            return BossBeam(self, "fig/b.png", 0.1)  # ビームを発射
+        return None
+
     def stop_music(self):
         """
         音楽を停止するメソッド
         """
-        pass  # Midbossにおいては音楽を停止する必要がないので、何も処理しない
+        self.music_player.stop()
 
+    def start_music(self):
+        """
+        音楽を再生するメソッド
+        """
+        self.music_player.play()
 
+    def switch_to_midboss(self):
+        """
+        小ボスに切り替わった際の処理
+        ここで音楽を再生するなどの追加の処理を行う
+        """
+        self.start_music()
 
 def main():
     pg.display.set_caption("はばたけ！こうかとん")
@@ -305,6 +415,10 @@ def main():
     enemies = [s_enemy, m_enemy, b_enemy]
     current_enemy = 0  # 現在表示中の敵のインデックス
     enemy_group = pg.sprite.Group(enemies[current_enemy])
+    beams = pg.sprite.Group()  # ビームグループの追加
+
+    # 初期状態で音楽を再生
+    enemies[current_enemy].start_music()
 
     while True:
         for event in pg.event.get():
@@ -320,14 +434,33 @@ def main():
                     # 新しい敵が大ボスならば、switch_to_bigbossを呼ぶ
                     if isinstance(enemies[current_enemy], Bigenemy):
                         enemies[current_enemy].switch_to_bigboss()
+                    # 新しい敵が小ボスならば、switch_to_smallbossを呼ぶ
+                    elif isinstance(enemies[current_enemy], Smallenemy):
+                        enemies[current_enemy].switch_to_smallboss()
+                    elif isinstance(enemies[current_enemy], Midboss):
+                        enemies[current_enemy].switch_to_midboss()
 
+                    # 新しい敵の音楽を再生
+                    enemies[current_enemy].start_music()
+
+                    # ビームグループを空にする
+                    beams.empty()
 
         # 現在の敵クラスに応じて背景を描画
         current_bg_img = enemies[current_enemy].bg_img
         screen.blit(current_bg_img, (0, 0))
+        
+        # 更新
         enemy_group.update()
         enemy_group.draw(screen)
-
+        
+        # ビームの発射と更新
+        beam = enemies[current_enemy].update()
+        if beam:
+            beams.add(beam)
+        beams.update()
+        beams.draw(screen)
+        
         pg.display.update()
         clock.tick(60)
 
